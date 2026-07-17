@@ -284,7 +284,9 @@ const SETTINGS_VERSION = 1 as const;
 const DEFAULT_OPENCLAW_GATEWAY_URL = "ws://localhost:18789";
 const DEFAULT_LOCAL_ADAPTER_GATEWAY_URL = "ws://localhost:18789";
 const DEFAULT_LOCAL_RUNTIME_URL = "http://localhost:7770";
-const DEFAULT_CLAW3D_RUNTIME_URL = "http://localhost:3000/api/runtime/custom";
+const DEFAULT_CLAW3D_RUNTIME_URL = process.env.NEXT_PUBLIC_APP_URL
+  ? `${process.env.NEXT_PUBLIC_APP_URL}/api/runtime/custom`
+  : "http://localhost:3000/api/runtime/custom";
 const DEFAULT_CUSTOM_RUNTIME_URL = "http://localhost:7770";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>

@@ -10,21 +10,42 @@ type CustomRuntimeRequestBody = {
 };
 
 const isRuntimeUrlAllowed = (runtimeUrl: string): boolean => {
+  if (process.env.NODE_ENV !== "production") return true;
+
+  // Auto-allow requests back to the app itself (self-hosted runtime)
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  let selfHostname: string | null = null;
+  if (appUrl) {
+    try {
+      selfHostname = new URL(appUrl).hostname.toLowerCase();
+    } catch {
+      // ignore
+    }
+  }
+
   const rawAllowlist = (
     process.env.CUSTOM_RUNTIME_ALLOWLIST ||
     process.env.UPSTREAM_ALLOWLIST ||
     ""
   ).trim();
-  if (!rawAllowlist) {
-    return process.env.NODE_ENV !== "production";
-  }
+
   try {
     const parsed = new URL(runtimeUrl);
-    const allowed = rawAllowlist
-      .split(",")
-      .map((entry) => entry.trim().toLowerCase())
-      .filter(Boolean);
-    return allowed.includes(parsed.hostname.toLowerCase());
+    const hostname = parsed.hostname.toLowerCase();
+
+    // Always allow calls back to the deployed app itself
+    if (selfHostname && hostname === selfHostname) return true;
+
+    // If an explicit allowlist is configured, check it
+    if (rawAllowlist) {
+      const allowed = rawAllowlist
+        .split(",")
+        .map((entry) => entry.trim().toLowerCase())
+        .filter(Boolean);
+      return allowed.includes(hostname);
+    }
+
+    return false;
   } catch {
     return false;
   }
@@ -48,7 +69,10 @@ const normalizeRuntimeUrl = (value: string): string => {
   parsed.password = "";
   const normalized = parsed.toString().replace(/\/$/, "");
   if (!isRuntimeUrlAllowed(normalized)) {
-    throw new Error("runtimeUrl is not in the allowed hosts list.");
+    throw new Error(
+      "runtimeUrl is not in the allowed hosts list. Set CUSTOM_RUNTIME_ALLOWLIST " +
+        "(comma-separated hostnames) in this deployment's environment to allow it."
+    );
   }
   return normalized;
 };
@@ -110,7 +134,7 @@ export async function POST(request: Request) {
       message === "runtimeUrl is required." ||
       message === "pathname is required." ||
       message === "runtimeUrl must use http, https, ws, or wss." ||
-      message === "runtimeUrl is not in the allowed hosts list."
+      message.startsWith("runtimeUrl is not in the allowed hosts list.")
         ? 400
         : 502;
     console.error("[runtime/custom] Proxy request failed.", error);
