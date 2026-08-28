@@ -170,8 +170,11 @@ const formatPct = (value: number) => `${value >= 0 ? "+" : ""}${value.toFixed(1)
 const formatLocalDateTime = (timestampMs: number, timeZone: string) =>
   new Intl.DateTimeFormat("en-US", {
     timeZone,
-    dateStyle: "medium",
-    timeStyle: "short",
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
     hour12: false,
     timeZoneName: "short",
   }).format(new Date(timestampMs));
