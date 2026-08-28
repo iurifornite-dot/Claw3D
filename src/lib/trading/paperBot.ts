@@ -87,6 +87,7 @@ type TickInput = {
 };
 
 const MAX_PRICE_HISTORY = 250;
+const MAX_CLOSED_TRADES = 500;
 
 const nextId = () =>
   typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -164,7 +165,7 @@ const closeOpenPosition = (
     balance: updatedBalance,
     equity: updatedBalance,
     openPosition: null,
-    closedTrades: [closedTrade, ...state.closedTrades],
+    closedTrades: [closedTrade, ...state.closedTrades].slice(0, MAX_CLOSED_TRADES),
     consecutiveLosses: nextConsecutiveLosses,
   };
 
@@ -176,13 +177,14 @@ const closeOpenPosition = (
   );
 
   if (nextState.consecutiveLosses >= state.config.risk.maxConsecutiveLosses) {
+    const shutdownReason = `Auto-shutdown: ${nextState.consecutiveLosses} consecutive losses reached.`;
     nextState = {
       ...nextState,
       isRunning: false,
       isShutdown: true,
-      shutdownReason: `Auto-shutdown: ${nextState.consecutiveLosses} consecutive losses reached.`,
+      shutdownReason,
     };
-    nextState = pushLog(nextState, "shutdown", nextState.shutdownReason, timestamp);
+    nextState = pushLog(nextState, "shutdown", shutdownReason, timestamp);
   }
 
   return nextState;
@@ -339,8 +341,12 @@ export const runPaperBotTick = (state: PaperBotState, input: TickInput): PaperBo
     };
   }
 
-  if (!nextState.isRunning || nextState.isShutdown) {
-    return enforceDailyLossLimit(nextState, input.timestamp);
+  if (nextState.isShutdown) {
+    return nextState;
+  }
+
+  if (!nextState.isRunning) {
+    return nextState;
   }
 
   if (nextState.openPosition && input.marketPrice <= nextState.openPosition.stopLossPrice) {

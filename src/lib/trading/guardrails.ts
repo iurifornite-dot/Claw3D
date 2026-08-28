@@ -28,6 +28,7 @@ export class MinuteRateLimiter {
   private readonly maxEventsPerMinute: number;
 
   private readonly eventTimes: number[] = [];
+  private headIndex = 0;
 
   constructor(maxEventsPerMinute: number) {
     this.maxEventsPerMinute = Math.max(1, Math.floor(maxEventsPerMinute));
@@ -35,13 +36,20 @@ export class MinuteRateLimiter {
 
   allow(now = Date.now()): boolean {
     const oneMinuteAgo = now - 60_000;
-    while (this.eventTimes.length > 0 && this.eventTimes[0] < oneMinuteAgo) {
-      this.eventTimes.shift();
+    while (this.headIndex < this.eventTimes.length && this.eventTimes[this.headIndex] < oneMinuteAgo) {
+      this.headIndex += 1;
     }
-    if (this.eventTimes.length >= this.maxEventsPerMinute) {
+    const activeEvents = this.eventTimes.length - this.headIndex;
+    if (activeEvents >= this.maxEventsPerMinute) {
       return false;
     }
     this.eventTimes.push(now);
+
+    if (this.headIndex > 0 && this.headIndex * 2 >= this.eventTimes.length) {
+      this.eventTimes.splice(0, this.headIndex);
+      this.headIndex = 0;
+    }
+
     return true;
   }
 }
